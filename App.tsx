@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, ShieldCheck, Pill, ArrowLeft } from 'lucide-react';
-import { WeightEntry, ViewState, Stats } from './types';
-import { getEntries, saveEntry, deleteEntry, deleteEntries, seedInitialData, exportData, importData } from './services/storageService';
+import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, ShieldCheck, Pill, ArrowLeft, Target, User } from 'lucide-react';
+import { WeightEntry, ViewState, Stats, UserProfile } from './types';
+import { getEntries, saveEntry, deleteEntry, deleteEntries, seedInitialData, exportData, importData, getProfile, saveProfile } from './services/storageService';
 import { StatCard, Card } from './components/ui/Card';
 import { EntryModal } from './components/EntryModal';
 import { HistoryList } from './components/HistoryList';
@@ -11,6 +12,7 @@ import { DosageChart } from './components/DosageChart';
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('dashboard');
   const [entries, setEntries] = useState<WeightEntry[]>([]);
+  const [profile, setProfile] = useState<UserProfile>(getProfile());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WeightEntry | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,85 +32,49 @@ const App: React.FC = () => {
     setEditingEntry(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this entry?')) {
-      deleteEntry(id);
-      refreshData();
-    }
-  };
-
-  const handleBulkDelete = (ids: string[]) => {
-    if (confirm(`Are you sure you want to delete ${ids.length} selected entries?`)) {
-      deleteEntries(ids);
-      refreshData();
-    }
-  };
-
-  const handleEdit = (entry: WeightEntry) => {
-    setEditingEntry(entry);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenModal = () => {
-    setEditingEntry(null);
-    setIsModalOpen(true);
-  };
-
-  const handleExport = () => {
-    const data = exportData();
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `zeptrack_backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (importData(content)) {
-        alert('Data imported successfully!');
-        refreshData();
-        setView('dashboard');
-      } else {
-        alert('Failed to import data. Please ensure the file is a valid ZepTrack backup.');
-      }
+  const handleUpdateProfile = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const updated: UserProfile = {
+      heightInches: Number(formData.get('heightInches')),
+      targetWeight: Number(formData.get('targetWeight')),
+      name: formData.get('name') as string
     };
-    reader.readAsText(file);
-    // Reset file input
-    if (e.target) e.target.value = '';
+    saveProfile(updated);
+    setProfile(updated);
+    alert('Profile saved!');
   };
 
   const stats: Stats = useMemo(() => {
     if (entries.length === 0) {
-      return {
-        currentWeight: 0,
-        startWeight: 0,
-        totalLoss: 0,
-        currentDosage: 0,
-        lowestWeight: 0,
-        highestWeight: 0
-      };
+      return { currentWeight: 0, startWeight: 0, totalLoss: 0, currentDosage: 0, lowestWeight: 0, highestWeight: 0, bmi: 0, progressPercent: 0, goalWeight: profile.targetWeight };
     }
     const current = entries[0];
     const start = entries[entries.length - 1];
     const weights = entries.map(e => e.weight);
+    
+    // BMI Calculation: (weight / height^2) * 703
+    const bmi = profile.heightInches > 0 
+      ? Number(((current.weight / Math.pow(profile.heightInches, 2)) * 703).toFixed(1)) 
+      : 0;
+
+    // Progress percentage: (Start - Current) / (Start - Goal)
+    const totalToLose = start.weight - profile.targetWeight;
+    const lost = start.weight - current.weight;
+    const progressPercent = totalToLose > 0 ? Math.min(100, Math.max(0, (lost / totalToLose) * 100)) : 0;
+
     return {
       currentWeight: current.weight,
       startWeight: start.weight,
       totalLoss: Number((start.weight - current.weight).toFixed(1)),
       currentDosage: current.dosage,
       lowestWeight: Math.min(...weights),
-      highestWeight: Math.max(...weights)
+      highestWeight: Math.max(...weights),
+      bmi,
+      progressPercent,
+      goalWeight: profile.targetWeight
     };
-  }, [entries]);
+  }, [entries, profile]);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-0">
@@ -122,16 +88,10 @@ const App: React.FC = () => {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">ZepTrack</h1>
             </div>
             <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setView('settings')}
-                className={`p-2 rounded-lg transition-colors ${view === 'settings' ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600'}`}
-              >
+              <button onClick={() => setView('settings')} className={`p-2 rounded-lg transition-colors ${view === 'settings' ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600'}`}>
                 <Settings size={20} />
               </button>
-              <button 
-                onClick={handleOpenModal}
-                className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm shadow-brand-200"
-              >
+              <button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
                 <Plus size={18} />
                 <span className="hidden sm:inline">Log Entry</span>
               </button>
@@ -143,40 +103,42 @@ const App: React.FC = () => {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {view === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatCard label="Current Weight" value={stats.currentWeight} subtext="lbs" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Weight" value={stats.currentWeight} subtext="lbs" />
               <StatCard label="Total Loss" value={stats.totalLoss} subtext="lbs" />
-              <StatCard label="Current Dose" value={stats.currentDosage} subtext="mg" onClick={() => setView('dosage')} />
+              <StatCard label="BMI" value={stats.bmi} />
+              <StatCard label="Dosage" value={stats.currentDosage} subtext="mg" onClick={() => setView('dosage')} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
-                <Card title="Weight Progress" className="h-full min-h-[400px]">
+                <Card title="Weight Progress" className="h-full">
                   <TrendChart entries={entries} />
                 </Card>
               </div>
               <div className="lg:col-span-1 space-y-6">
-                <Card title="At a Glance">
-                  <div className="space-y-6">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-slate-500">Starting Weight</span>
-                        <span className="font-semibold text-slate-700">{stats.startWeight} lbs</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2">
-                        <div className="bg-slate-300 h-2 rounded-full" style={{ width: '100%' }}></div>
+                <Card title="Goal Progress">
+                  <div className="flex flex-col items-center justify-center pt-2 pb-6">
+                    <div className="relative w-40 h-40 flex items-center justify-center mb-6">
+                      <svg className="w-full h-full transform -rotate-90 overflow-visible" viewBox="0 0 100 100">
+                        <circle className="text-slate-100" strokeWidth="8" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" />
+                        <circle className="text-brand-500 transition-all duration-1000 ease-out" strokeWidth="8" strokeDasharray={264} strokeDashoffset={264 - (264 * stats.progressPercent) / 100} strokeLinecap="round" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" />
+                      </svg>
+                      <div className="absolute flex flex-col items-center">
+                        <span className="text-3xl font-black text-slate-800">{Math.round(stats.progressPercent)}%</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">To Goal</span>
                       </div>
                     </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-slate-500">Lowest Recorded</span>
-                        <span className="font-semibold text-slate-700">{stats.lowestWeight} lbs</span>
+                    <div className="w-full space-y-3">
+                      <div className="flex justify-between text-xs font-bold text-slate-500 uppercase">
+                        <span>Current: {stats.currentWeight}</span>
+                        <span>Goal: {stats.goalWeight}</span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2">
-                        <div 
-                          className="bg-brand-500 h-2 rounded-full" 
-                          style={{ width: `${Math.min(100, (stats.startWeight - stats.currentWeight) / (stats.startWeight - stats.lowestWeight) * 100 || 0)}%` }}
-                        ></div>
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500 rounded-full" style={{ width: `${stats.progressPercent}%` }} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-slate-400 font-medium">{Number((stats.currentWeight - stats.goalWeight).toFixed(1))} lbs remaining to target</p>
                       </div>
                     </div>
                   </div>
@@ -184,157 +146,75 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <Card 
-              title="Recent History" 
-              action={
-                <button onClick={() => setView('history')} className="text-brand-600 hover:text-brand-800 text-sm font-medium transition-colors">
-                  View All
-                </button>
-              }
-            >
-              <HistoryList 
-                entries={entries.slice(0, 5)} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete}
-                onBulkDelete={handleBulkDelete}
-              />
+            <Card title="Recent History" action={<button onClick={() => setView('history')} className="text-brand-600 hover:text-brand-800 text-sm font-medium">View All</button>}>
+              <HistoryList entries={entries.slice(0, 5)} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={(id) => { if(confirm('Delete?')) { deleteEntry(id); refreshData(); }}} onBulkDelete={(ids) => { if(confirm('Delete?')) { deleteEntries(ids); refreshData(); }}} />
             </Card>
           </div>
         )}
 
         {view === 'dosage' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
-            <button 
-              onClick={() => setView('dashboard')}
-              className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium transition-colors mb-2"
-            >
-              <ArrowLeft size={18} />
-              <span>Back to Dashboard</span>
-            </button>
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Dosage History</h2>
-            </div>
-            <Card className="min-h-[450px]">
-              <DosageChart entries={entries} />
-            </Card>
-            <Card title="Dosage Insights">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="block text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Current Maintenance</span>
-                  <span className="text-xl font-bold text-slate-800">{stats.currentDosage} mg</span>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="block text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Dose Changes</span>
-                  <span className="text-xl font-bold text-slate-800">
-                    {new Set(entries.map(e => e.dosage)).size} Levels
-                  </span>
-                </div>
-              </div>
-            </Card>
+            <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium mb-2"><ArrowLeft size={18} /><span>Back</span></button>
+            <Card title="Dosage History"><DosageChart entries={entries} /></Card>
           </div>
         )}
 
         {view === 'history' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Entry Log</h2>
-            </div>
-            <Card className="min-h-[500px]">
-              <HistoryList 
-                entries={entries} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete}
-                onBulkDelete={handleBulkDelete}
-              />
-            </Card>
+             <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium mb-2"><ArrowLeft size={18} /><span>Back</span></button>
+             <Card title="Entry Log"><HistoryList entries={entries} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={(id) => { if(confirm('Delete?')) { deleteEntry(id); refreshData(); }}} onBulkDelete={(ids) => { if(confirm('Delete?')) { deleteEntries(ids); refreshData(); }}} /></Card>
           </div>
         )}
 
         {view === 'settings' && (
-          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-left-8 duration-300">
-            <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
-            <Card title="Data Management">
-              <div className="space-y-6">
-                <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="p-2 bg-brand-100 text-brand-600 rounded-lg">
-                    <ShieldCheck size={20} />
+          <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-left-8 duration-300">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
+              <button onClick={() => setView('dashboard')} className="text-sm font-bold text-brand-600 uppercase">Done</button>
+            </div>
+            
+            <Card title="Personal Profile">
+              <form onSubmit={handleUpdateProfile} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Display Name</label>
+                    <input name="name" defaultValue={profile.name} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-brand-500/10 outline-none text-sm" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-900">Privacy & Security</h4>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      ZepTrack stores all your data locally in your browser. We never transmit your health information to any server. Use the backup options below to keep your data safe.
-                    </p>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Height (Inches)</label>
+                    <input name="heightInches" type="number" defaultValue={profile.heightInches} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-brand-500/10 outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Goal Weight (lbs)</label>
+                    <input name="targetWeight" type="number" defaultValue={profile.targetWeight} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-brand-500/10 outline-none text-sm" />
                   </div>
                 </div>
+                <button type="submit" className="w-full py-3 bg-brand-600 text-white font-bold rounded-xl shadow-md hover:bg-brand-700 transition-colors">Update Profile</button>
+              </form>
+            </Card>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <button 
-                    onClick={handleExport}
-                    className="flex items-center justify-center gap-3 px-6 py-4 bg-white border-2 border-slate-100 hover:border-brand-200 hover:bg-brand-50 rounded-2xl text-slate-700 font-semibold transition-all group"
-                  >
-                    <Download className="text-slate-400 group-hover:text-brand-600" size={20} />
-                    <span>Export Backup</span>
-                  </button>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center justify-center gap-3 px-6 py-4 bg-white border-2 border-slate-100 hover:border-brand-200 hover:bg-brand-50 rounded-2xl text-slate-700 font-semibold transition-all group"
-                  >
-                    <Upload className="text-slate-400 group-hover:text-brand-600" size={20} />
-                    <span>Import Backup</span>
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleImport} 
-                    className="hidden" 
-                    accept=".json" 
-                  />
-                </div>
+            <Card title="Data Backup">
+              <div className="grid grid-cols-2 gap-4">
+                <button onClick={() => { const d = exportData(); const blob = new Blob([d], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'zeptrack_backup.json'; a.click(); }} className="flex flex-col items-center p-6 border-2 border-slate-100 hover:border-brand-200 rounded-2xl gap-3 transition-all"><Download className="text-slate-400" /> <span className="font-bold text-sm">Export JSON</span></button>
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center p-6 border-2 border-slate-100 hover:border-brand-200 rounded-2xl gap-3 transition-all"><Upload className="text-slate-400" /> <span className="font-bold text-sm">Import JSON</span></button>
+                <input type="file" ref={fileInputRef} onChange={(e) => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload=(ev)=> { if(importData(ev.target?.result as string)) { refreshData(); setView('dashboard'); alert('Imported!'); }}; r.readAsText(f); }}} className="hidden" />
               </div>
             </Card>
           </div>
         )}
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:hidden z-30 pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:hidden z-30">
         <div className="flex justify-around items-center h-16">
-          <button 
-            onClick={() => setView('dashboard')}
-            className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${view === 'dashboard' ? 'text-brand-600' : 'text-slate-400'}`}
-          >
-            <LayoutDashboard size={20} />
-            <span className="text-[10px] font-medium">Dashboard</span>
-          </button>
-          <button 
-            onClick={() => setView('dosage')}
-            className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${view === 'dosage' ? 'text-brand-600' : 'text-slate-400'}`}
-          >
-            <Pill size={20} />
-            <span className="text-[10px] font-medium">Dosage</span>
-          </button>
-          <button 
-            onClick={() => setView('history')}
-            className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${view === 'history' ? 'text-brand-600' : 'text-slate-400'}`}
-          >
-            <History size={20} />
-            <span className="text-[10px] font-medium">History</span>
-          </button>
-          <button 
-            onClick={() => setView('settings')}
-            className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${view === 'settings' ? 'text-brand-600' : 'text-slate-400'}`}
-          >
-            <Settings size={20} />
-            <span className="text-[10px] font-medium">Settings</span>
-          </button>
+          <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 ${view === 'dashboard' ? 'text-brand-600' : 'text-slate-400'}`}><LayoutDashboard size={20}/><span className="text-[10px] font-bold">DASH</span></button>
+          <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 ${view === 'history' ? 'text-brand-600' : 'text-slate-400'}`}><History size={20}/><span className="text-[10px] font-bold">HISTORY</span></button>
+          <button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="flex flex-col items-center justify-center -translate-y-4 bg-brand-600 text-white w-14 h-14 rounded-full shadow-lg border-4 border-white"><Plus size={28}/></button>
+          <button onClick={() => setView('dosage')} className={`flex flex-col items-center gap-1 ${view === 'dosage' ? 'text-brand-600' : 'text-slate-400'}`}><Pill size={20}/><span className="text-[10px] font-bold">DOSAGE</span></button>
+          <button onClick={() => setView('settings')} className={`flex flex-col items-center gap-1 ${view === 'settings' ? 'text-brand-600' : 'text-slate-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">SETUP</span></button>
         </div>
       </div>
 
-      <EntryModal 
-        isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setEditingEntry(null); }} 
-        onSave={handleSave}
-        initialData={editingEntry}
-      />
+      <EntryModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave} initialData={editingEntry} />
     </div>
   );
 };

@@ -1,13 +1,13 @@
-import { WeightEntry } from '../types';
+import { WeightEntry, UserProfile } from '../types';
 
 const STORAGE_KEY = 'zeptrack_entries_v1';
+const PROFILE_KEY = 'zeptrack_profile_v1';
 
 export const getEntries = (): WeightEntry[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) return [];
     const parsed = JSON.parse(data);
-    // Sort by date descending (newest first) by default
     return parsed.sort((a: WeightEntry, b: WeightEntry) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
@@ -44,27 +44,45 @@ export const deleteEntries = (ids: string[]): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
 };
 
+export const getProfile = (): UserProfile => {
+  const data = localStorage.getItem(PROFILE_KEY);
+  if (!data) return { heightInches: 67, targetWeight: 180 }; // Default defaults
+  return JSON.parse(data);
+};
+
+export const saveProfile = (profile: UserProfile): void => {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+};
+
 export const getLastDosage = (): number => {
   const entries = getEntries();
-  if (entries.length === 0) return 2.5; // Default starting dose for Zepbound
+  if (entries.length === 0) return 2.5;
   return entries[0].dosage;
 };
 
 export const exportData = (): string => {
   const entries = getEntries();
-  return JSON.stringify(entries, null, 2);
+  const profile = getProfile();
+  return JSON.stringify({ entries, profile }, null, 2);
 };
 
 export const importData = (jsonData: string): boolean => {
   try {
     const parsed = JSON.parse(jsonData);
-    if (!Array.isArray(parsed)) return false;
+    let entries = [];
+    if (Array.isArray(parsed)) {
+      entries = parsed;
+    } else if (parsed.entries) {
+      entries = parsed.entries;
+      if (parsed.profile) saveProfile(parsed.profile);
+    } else {
+      return false;
+    }
     
-    // Basic validation: ensure items have required fields
-    const isValid = parsed.every(e => e.id && e.date && typeof e.weight === 'number');
+    const isValid = entries.every((e: any) => e.id && e.date && typeof e.weight === 'number');
     if (!isValid) return false;
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
     return true;
   } catch (e) {
     console.error("Failed to import data", e);
@@ -77,6 +95,8 @@ export const seedInitialData = () => {
     const today = new Date();
     const data: WeightEntry[] = [];
     let currentWeight = 220;
+    const sites: any[] = ['Stomach', 'Thigh', 'Arm'];
+    const sides: any[] = ['Left', 'Right'];
     
     for (let i = 8; i >= 0; i--) {
       const d = new Date(today);
@@ -88,6 +108,9 @@ export const seedInitialData = () => {
         date: d.toISOString().split('T')[0],
         weight: Number(currentWeight.toFixed(1)),
         dosage: dose,
+        injectionSite: sites[i % 3],
+        injectionSide: sides[i % 2],
+        sideEffects: i === 4 ? ['Nausea'] : [],
         createdAt: Date.now() - (i * 86400000)
       });
       currentWeight -= (Math.random() * 1.5 + 0.5); 
