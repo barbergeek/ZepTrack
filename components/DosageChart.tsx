@@ -13,15 +13,24 @@ interface DosageChartProps {
   entries: WeightEntry[];
 }
 
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export const DosageChart: React.FC<DosageChartProps> = ({ entries }) => {
   // Sort entries by date ascending for the chart
   const data = [...entries].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
-  ).map(e => ({
-    date: e.date,
-    dosage: e.dosage,
-    displayDate: new Date(e.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  }));
+  ).map(e => {
+    const localDate = parseLocalDate(e.date);
+    return {
+      date: e.date,
+      dosage: e.dosage,
+      displayDate: localDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    };
+  });
 
   if (data.length === 0) {
     return (

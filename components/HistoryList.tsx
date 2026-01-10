@@ -9,6 +9,17 @@ interface HistoryListProps {
   onBulkDelete: (ids: string[]) => void;
 }
 
+/**
+ * Helper to parse YYYY-MM-DD string into a local Date object.
+ * new Date("YYYY-MM-DD") is treated as UTC, which causes off-by-one errors in local display.
+ * Using slashes (YYYY/MM/DD) or manual parsing treats it as local.
+ */
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export const HistoryList: React.FC<HistoryListProps> = ({ entries, onEdit, onDelete, onBulkDelete }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -89,6 +100,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, onEdit, onDel
         <div className="divide-y divide-slate-100">
           {entries.map((entry) => {
             const isSelected = selectedIds.has(entry.id);
+            const localDate = parseLocalDate(entry.date);
+            
             return (
               <div 
                 key={entry.id} 
@@ -104,7 +117,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, onEdit, onDel
                     </button>
                   </div>
                   <div className="col-span-2 text-sm font-medium text-slate-800">
-                    {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {localDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
                   <div className="col-span-2 text-sm font-bold text-slate-700">
                     {entry.weight} <span className="text-slate-400 font-normal text-xs ml-0.5">lbs</span>
@@ -143,7 +156,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, onEdit, onDel
                   <div className="flex-grow">
                     <div className="flex justify-between items-start mb-1">
                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                         {new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                         {localDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                        </span>
                        <div className="flex gap-2">
                          <button onClick={() => onEdit(entry)} className="p-1 text-slate-400"><Edit2 size={16} /></button>
