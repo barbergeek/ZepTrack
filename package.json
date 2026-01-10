@@ -14,20 +14,11 @@
     "recharts": "^2.15.0"
   },
   "devDependencies": {
-<<<<<<< HEAD
-    "@types/node": "^20.11.24",
-    "@types/react": "^18.2.61",
-    "@types/react-dom": "^18.2.19",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.3.3",
-    "vite": "^7.3.1"
-=======
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
->>>>>>> e1413ce6fe1ffbd7889a8da41502198d9a720289
   }
 }
