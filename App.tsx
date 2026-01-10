@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, ShieldCheck, Pill, ArrowLeft, Target, User } from 'lucide-react';
 import { WeightEntry, ViewState, Stats, UserProfile } from './types';
@@ -8,6 +7,7 @@ import { EntryModal } from './components/EntryModal';
 import { HistoryList } from './components/HistoryList';
 import { TrendChart } from './components/TrendChart';
 import { DosageChart } from './components/DosageChart';
+import { BMIChart } from './components/BMIChart';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('dashboard');
@@ -106,7 +106,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Weight" value={stats.currentWeight} subtext="lbs" />
               <StatCard label="Total Loss" value={stats.totalLoss} subtext="lbs" />
-              <StatCard label="BMI" value={stats.bmi} />
+              <StatCard label="BMI" value={stats.bmi} onClick={() => setView('bmi')} />
               <StatCard label="Dosage" value={stats.currentDosage} subtext="mg" onClick={() => setView('dosage')} />
             </div>
 
@@ -156,6 +156,13 @@ const App: React.FC = () => {
           <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
             <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium mb-2"><ArrowLeft size={18} /><span>Back</span></button>
             <Card title="Dosage History"><DosageChart entries={entries} /></Card>
+          </div>
+        )}
+
+        {view === 'bmi' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
+            <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium mb-2"><ArrowLeft size={18} /><span>Back</span></button>
+            <Card title="BMI Analysis"><BMIChart entries={entries} profile={profile} /></Card>
           </div>
         )}
 
