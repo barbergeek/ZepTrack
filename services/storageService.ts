@@ -3,6 +3,17 @@ import { WeightEntry, UserProfile } from '../types';
 const STORAGE_KEY = 'zeptrack_entries_v1';
 const PROFILE_KEY = 'zeptrack_profile_v1';
 
+/**
+ * Generates a unique ID. 
+ * Falls back to a custom implementation if crypto.randomUUID is unavailable (non-secure contexts).
+ */
+export const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+};
+
 export const getEntries = (): WeightEntry[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -104,7 +115,7 @@ export const seedInitialData = () => {
       const dose = i > 4 ? 2.5 : 5.0;
       
       data.push({
-        id: crypto.randomUUID(),
+        id: generateId(),
         date: d.toISOString().split('T')[0],
         weight: Number(currentWeight.toFixed(1)),
         dosage: dose,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, AlertCircle, MoveHorizontal } from 'lucide-react';
 import { WeightEntry, InjectionSite, InjectionSide } from '../types';
-import { getLastDosage } from '../services/storageService';
+import { getLastDosage, generateId } from '../services/storageService';
 
 interface EntryModalProps {
   isOpen: boolean;
@@ -65,7 +65,7 @@ export const EntryModal: React.FC<EntryModalProps> = ({ isOpen, onClose, onSave,
     if (!date || !weight || !dosage) return;
 
     const entry: WeightEntry = {
-      id: initialData?.id || crypto.randomUUID(),
+      id: initialData?.id || generateId(),
       date,
       weight: parseFloat(weight),
       dosage: parseFloat(dosage),
