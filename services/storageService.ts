@@ -1,10 +1,9 @@
 import { WeightEntry, UserProfile } from '../types';
 
-const STORAGE_KEY = 'zeptrack_entries_v1';
-const PROFILE_KEY = 'zeptrack_profile_v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 /**
- * Generates a unique ID. 
+ * Generates a unique ID.
  * Falls back to a custom implementation if crypto.randomUUID is unavailable (non-secure contexts).
  */
 export const generateId = (): string => {
@@ -14,70 +13,101 @@ export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
 };
 
-export const getEntries = (): WeightEntry[] => {
+export const getEntries = async (): Promise<WeightEntry[]> => {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return [];
-    const parsed = JSON.parse(data);
-    return parsed.sort((a: WeightEntry, b: WeightEntry) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    const response = await fetch(`${API_BASE_URL}/entries`);
+    if (!response.ok) throw new Error('Failed to fetch entries');
+    return await response.json();
   } catch (e) {
     console.error("Failed to load entries", e);
     return [];
   }
 };
 
-export const saveEntry = (entry: WeightEntry): void => {
-  const entries = getEntries();
-  const existingIndex = entries.findIndex(e => e.id === entry.id);
-  
-  let newEntries;
-  if (existingIndex >= 0) {
-    newEntries = [...entries];
-    newEntries[existingIndex] = entry;
-  } else {
-    newEntries = [entry, ...entries];
+export const saveEntry = async (entry: WeightEntry): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    });
+    if (!response.ok) throw new Error('Failed to save entry');
+  } catch (e) {
+    console.error("Failed to save entry", e);
+    throw e;
   }
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
 };
 
-export const deleteEntry = (id: string): void => {
-  const entries = getEntries();
-  const newEntries = entries.filter(e => e.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
+export const deleteEntry = async (id: string): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/entries/${id}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Failed to delete entry');
+  } catch (e) {
+    console.error("Failed to delete entry", e);
+    throw e;
+  }
 };
 
-export const deleteEntries = (ids: string[]): void => {
-  const entries = getEntries();
-  const newEntries = entries.filter(e => !ids.includes(e.id));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
+export const deleteEntries = async (ids: string[]): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/entries/delete-batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    if (!response.ok) throw new Error('Failed to delete entries');
+  } catch (e) {
+    console.error("Failed to delete entries", e);
+    throw e;
+  }
 };
 
-export const getProfile = (): UserProfile => {
-  const data = localStorage.getItem(PROFILE_KEY);
-  if (!data) return { heightInches: 67, targetWeight: 180 }; // Default defaults
-  return JSON.parse(data);
+export const getProfile = async (): Promise<UserProfile> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile`);
+    if (!response.ok) return { heightInches: 67, targetWeight: 180 };
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to load profile", e);
+    return { heightInches: 67, targetWeight: 180 };
+  }
 };
 
-export const saveProfile = (profile: UserProfile): void => {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+export const saveProfile = async (profile: UserProfile): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile)
+    });
+    if (!response.ok) throw new Error('Failed to save profile');
+  } catch (e) {
+    console.error("Failed to save profile", e);
+    throw e;
+  }
 };
 
-export const getLastDosage = (): number => {
-  const entries = getEntries();
-  if (entries.length === 0) return 2.5;
-  return entries[0].dosage;
+export const getLastDosage = async (): Promise<number> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/entries/meta/last-dosage`);
+    if (!response.ok) return 2.5;
+    const data = await response.json();
+    return data.dosage || 2.5;
+  } catch (e) {
+    console.error("Failed to get last dosage", e);
+    return 2.5;
+  }
 };
 
-export const exportData = (): string => {
-  const entries = getEntries();
-  const profile = getProfile();
+export const exportData = async (): Promise<string> => {
+  const entries = await getEntries();
+  const profile = await getProfile();
   return JSON.stringify({ entries, profile }, null, 2);
 };
 
-export const importData = (jsonData: string): boolean => {
+export const importData = async (jsonData: string): Promise<boolean> => {
   try {
     const parsed = JSON.parse(jsonData);
     let entries = [];
@@ -85,15 +115,17 @@ export const importData = (jsonData: string): boolean => {
       entries = parsed;
     } else if (parsed.entries) {
       entries = parsed.entries;
-      if (parsed.profile) saveProfile(parsed.profile);
+      if (parsed.profile) await saveProfile(parsed.profile);
     } else {
       return false;
     }
-    
+
     const isValid = entries.every((e: any) => e.id && e.date && typeof e.weight === 'number');
     if (!isValid) return false;
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    for (const entry of entries) {
+      await saveEntry(entry);
+    }
     return true;
   } catch (e) {
     console.error("Failed to import data", e);
@@ -101,19 +133,20 @@ export const importData = (jsonData: string): boolean => {
   }
 };
 
-export const seedInitialData = () => {
-  if (getEntries().length === 0) {
+export const seedInitialData = async () => {
+  const existingEntries = await getEntries();
+  if (existingEntries.length === 0) {
     const today = new Date();
     const data: WeightEntry[] = [];
     let currentWeight = 220;
     const sites: any[] = ['Stomach', 'Thigh', 'Arm'];
     const sides: any[] = ['Left', 'Right'];
-    
+
     for (let i = 8; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - (i * 7));
       const dose = i > 4 ? 2.5 : 5.0;
-      
+
       data.push({
         id: generateId(),
         date: d.toISOString().split('T')[0],
@@ -124,8 +157,11 @@ export const seedInitialData = () => {
         sideEffects: i === 4 ? ['Nausea'] : [],
         createdAt: Date.now() - (i * 86400000)
       });
-      currentWeight -= (Math.random() * 1.5 + 0.5); 
+      currentWeight -= (Math.random() * 1.5 + 0.5);
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+    for (const entry of data) {
+      await saveEntry(entry);
+    }
   }
 };

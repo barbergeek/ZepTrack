@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  zeptrack:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - zeptrack-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/data/zeptrack.db
+    restart: unless-stopped
+
+volumes:
+  zeptrack-data:
+    driver: local

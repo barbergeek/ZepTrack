@@ -56,3 +56,9 @@ Thumbs.db
 
 # Testing
 coverage/
+
+# Database
+data/
+*.db
+*.db-shm
+*.db-wal

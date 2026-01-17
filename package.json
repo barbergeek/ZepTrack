@@ -1,23 +1,38 @@
 {
   "name": "zeptrack",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node --loader tsx server/index.ts",
+    "docker:build": "docker build -t zeptrack .",
+    "docker:run": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
   },
   "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
   }

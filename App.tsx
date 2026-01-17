@@ -12,27 +12,33 @@ import { BMIChart } from './components/BMIChart';
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('dashboard');
   const [entries, setEntries] = useState<WeightEntry[]>([]);
-  const [profile, setProfile] = useState<UserProfile>(getProfile());
+  const [profile, setProfile] = useState<UserProfile>({ heightInches: 67, targetWeight: 180 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WeightEntry | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    seedInitialData();
-    refreshData();
+    const initData = async () => {
+      await seedInitialData();
+      await refreshData();
+      const loadedProfile = await getProfile();
+      setProfile(loadedProfile);
+    };
+    initData();
   }, []);
 
-  const refreshData = () => {
-    setEntries(getEntries());
+  const refreshData = async () => {
+    const data = await getEntries();
+    setEntries(data);
   };
 
-  const handleSave = (entry: WeightEntry) => {
-    saveEntry(entry);
-    refreshData();
+  const handleSave = async (entry: WeightEntry) => {
+    await saveEntry(entry);
+    await refreshData();
     setEditingEntry(null);
   };
 
-  const handleUpdateProfile = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const updated: UserProfile = {
@@ -40,7 +46,7 @@ const App: React.FC = () => {
       targetWeight: Number(formData.get('targetWeight')),
       name: formData.get('name') as string
     };
-    saveProfile(updated);
+    await saveProfile(updated);
     setProfile(updated);
     alert('Profile saved!');
   };
@@ -147,7 +153,7 @@ const App: React.FC = () => {
             </div>
 
             <Card title="Recent History" action={<button onClick={() => setView('history')} className="text-brand-600 hover:text-brand-800 text-sm font-medium">View All</button>}>
-              <HistoryList entries={entries.slice(0, 5)} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={(id) => { if(confirm('Delete?')) { deleteEntry(id); refreshData(); }}} onBulkDelete={(ids) => { if(confirm('Delete?')) { deleteEntries(ids); refreshData(); }}} />
+              <HistoryList entries={entries.slice(0, 5)} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={async (id) => { if(confirm('Delete?')) { await deleteEntry(id); await refreshData(); }}} onBulkDelete={async (ids) => { if(confirm('Delete?')) { await deleteEntries(ids); await refreshData(); }}} />
             </Card>
           </div>
         )}
@@ -169,7 +175,7 @@ const App: React.FC = () => {
         {view === 'history' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
              <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium mb-2"><ArrowLeft size={18} /><span>Back</span></button>
-             <Card title="Entry Log"><HistoryList entries={entries} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={(id) => { if(confirm('Delete?')) { deleteEntry(id); refreshData(); }}} onBulkDelete={(ids) => { if(confirm('Delete?')) { deleteEntries(ids); refreshData(); }}} /></Card>
+             <Card title="Entry Log"><HistoryList entries={entries} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={async (id) => { if(confirm('Delete?')) { await deleteEntry(id); await refreshData(); }}} onBulkDelete={async (ids) => { if(confirm('Delete?')) { await deleteEntries(ids); await refreshData(); }}} /></Card>
           </div>
         )}
 
@@ -202,9 +208,9 @@ const App: React.FC = () => {
 
             <Card title="Data Backup">
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => { const d = exportData(); const blob = new Blob([d], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'zeptrack_backup.json'; a.click(); }} className="flex flex-col items-center p-6 border-2 border-slate-100 hover:border-brand-200 rounded-2xl gap-3 transition-all"><Download className="text-slate-400" /> <span className="font-bold text-sm">Export JSON</span></button>
+                <button onClick={async () => { const d = await exportData(); const blob = new Blob([d], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'zeptrack_backup.json'; a.click(); }} className="flex flex-col items-center p-6 border-2 border-slate-100 hover:border-brand-200 rounded-2xl gap-3 transition-all"><Download className="text-slate-400" /> <span className="font-bold text-sm">Export JSON</span></button>
                 <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center p-6 border-2 border-slate-100 hover:border-brand-200 rounded-2xl gap-3 transition-all"><Upload className="text-slate-400" /> <span className="font-bold text-sm">Import JSON</span></button>
-                <input type="file" ref={fileInputRef} onChange={(e) => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload=(ev)=> { if(importData(ev.target?.result as string)) { refreshData(); setView('dashboard'); alert('Imported!'); }}; r.readAsText(f); }}} className="hidden" />
+                <input type="file" ref={fileInputRef} onChange={async (e) => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload= async (ev)=> { if(await importData(ev.target?.result as string)) { await refreshData(); setView('dashboard'); alert('Imported!'); }}; r.readAsText(f); }}} className="hidden" />
               </div>
             </Card>
           </div>
