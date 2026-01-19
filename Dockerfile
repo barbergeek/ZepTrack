@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -24,7 +24,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy built frontend from build stage
 COPY --from=frontend-build /app/dist ./dist
@@ -32,6 +32,9 @@ COPY --from=frontend-build /app/dist ./dist
 # Copy server code
 COPY server ./server
 COPY tsconfig.json ./
+
+# Install tsx for running TypeScript
+RUN npm install tsx
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/data
@@ -45,4 +48,4 @@ ENV PORT=3000
 ENV DB_PATH=/app/data/zeptrack.db
 
 # Start the server
-CMD ["node", "--loader", "tsx", "server/index.ts"]
+CMD ["npx", "tsx", "server/index.ts"]

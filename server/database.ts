@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3';
+import BetterSqlite3 from 'better-sqlite3';
+import type { Database as BetterSqlite3Database } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
@@ -26,7 +27,7 @@ export interface UserProfile {
 }
 
 export class Database {
-  private db: Database.Database | null = null;
+  private db: BetterSqlite3Database | null = null;
 
   constructor() {
     // Ensure data directory exists
@@ -37,7 +38,7 @@ export class Database {
   }
 
   initialize() {
-    this.db = new Database(DB_PATH);
+    this.db = new BetterSqlite3(DB_PATH);
     this.createTables();
     this.createDefaultProfile();
   }
