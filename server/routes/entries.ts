@@ -1,13 +1,29 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { Database } from '../database';
+import { validateEntry, validateIds } from '../validation';
 
 export const entriesRouter = Router();
+
+function generateId(): string {
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+}
 
 // Get all entries
 entriesRouter.get('/', (req, res) => {
   const db: Database = (req as any).db;
   const entries = db.getEntries();
   res.json(entries);
+});
+
+// Get last dosage - must be before /:id route
+entriesRouter.get('/meta/last-dosage', (req, res) => {
+  const db: Database = (req as any).db;
+  const dosage = db.getLastDosage();
+  res.json({ dosage });
 });
 
 // Get single entry
@@ -26,11 +42,21 @@ entriesRouter.get('/:id', (req, res) => {
 entriesRouter.post('/', (req, res) => {
   const db: Database = (req as any).db;
 
+  const validation = validateEntry(req.body);
+  if (!validation.valid) {
+    return res.status(400).json({ error: 'Validation failed', details: validation.errors });
+  }
+
   try {
-    const entry = db.saveEntry(req.body);
+    const entryData = {
+      ...validation.data,
+      id: validation.data.id || generateId(),
+      createdAt: validation.data.createdAt || Date.now()
+    };
+    const entry = db.saveEntry(entryData);
     res.json(entry);
   } catch (error) {
-    res.status(400).json({ error: 'Failed to save entry' });
+    res.status(500).json({ error: 'Failed to save entry' });
   }
 });
 
@@ -38,11 +64,21 @@ entriesRouter.post('/', (req, res) => {
 entriesRouter.put('/:id', (req, res) => {
   const db: Database = (req as any).db;
 
+  const validation = validateEntry({ ...req.body, id: req.params.id });
+  if (!validation.valid) {
+    return res.status(400).json({ error: 'Validation failed', details: validation.errors });
+  }
+
   try {
-    const entry = db.saveEntry({ ...req.body, id: req.params.id });
+    const entryData = {
+      ...validation.data,
+      id: req.params.id,
+      createdAt: validation.data.createdAt || Date.now()
+    };
+    const entry = db.saveEntry(entryData);
     res.json(entry);
   } catch (error) {
-    res.status(400).json({ error: 'Failed to update entry' });
+    res.status(500).json({ error: 'Failed to update entry' });
   }
 });
 
@@ -61,19 +97,12 @@ entriesRouter.delete('/:id', (req, res) => {
 // Delete multiple entries
 entriesRouter.post('/delete-batch', (req, res) => {
   const db: Database = (req as any).db;
-  const { ids } = req.body;
 
-  if (!Array.isArray(ids)) {
-    return res.status(400).json({ error: 'ids must be an array' });
+  const validation = validateIds(req.body.ids);
+  if (!validation.valid) {
+    return res.status(400).json({ error: validation.message });
   }
 
-  const deletedCount = db.deleteEntries(ids);
+  const deletedCount = db.deleteEntries(validation.data);
   res.json({ deletedCount });
-});
-
-// Get last dosage
-entriesRouter.get('/meta/last-dosage', (req, res) => {
-  const db: Database = (req as any).db;
-  const dosage = db.getLastDosage();
-  res.json({ dosage });
 });

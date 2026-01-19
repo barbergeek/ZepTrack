@@ -13,6 +13,20 @@ export interface WeightEntry {
   dosage: number;
   injectionSite?: string;
   injectionSide?: string;
+  sideEffects?: string[];
+  notes?: string;
+  createdAt: number;
+}
+
+// Internal type for raw DB rows (sideEffects stored as JSON string)
+interface WeightEntryRow {
+  id: string;
+  userId: string;
+  date: string;
+  weight: number;
+  dosage: number;
+  injectionSite?: string;
+  injectionSide?: string;
   sideEffects?: string;
   notes?: string;
   createdAt: number;
@@ -151,7 +165,7 @@ export class Database {
       FROM weight_entries
       WHERE user_id = ?
       ORDER BY date DESC, created_at DESC
-    `).all(userId) as WeightEntry[];
+    `).all(userId) as WeightEntryRow[];
 
     // Parse side effects from JSON string
     return rows.map(row => ({
@@ -177,13 +191,13 @@ export class Database {
         created_at as createdAt
       FROM weight_entries
       WHERE id = ? AND user_id = ?
-    `).get(id, userId) as WeightEntry | undefined;
+    `).get(id, userId) as WeightEntryRow | undefined;
 
     if (!row) return null;
 
     return {
       ...row,
-      sideEffects: row.sideEffects ? JSON.parse(row.sideEffects as string) : undefined
+      sideEffects: row.sideEffects ? JSON.parse(row.sideEffects) : undefined
     };
   }
 

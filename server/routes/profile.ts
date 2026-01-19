@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Database } from '../database';
+import { validateProfile } from '../validation';
 
 export const profileRouter = Router();
 
@@ -19,10 +20,15 @@ profileRouter.get('/', (req, res) => {
 profileRouter.post('/', (req, res) => {
   const db: Database = (req as any).db;
 
+  const validation = validateProfile(req.body);
+  if (!validation.valid) {
+    return res.status(400).json({ error: 'Validation failed', details: validation.errors });
+  }
+
   try {
-    const profile = db.saveProfile('default-user', req.body);
+    const profile = db.saveProfile('default-user', validation.data);
     res.json(profile);
   } catch (error) {
-    res.status(400).json({ error: 'Failed to save profile' });
+    res.status(500).json({ error: 'Failed to save profile' });
   }
 });
