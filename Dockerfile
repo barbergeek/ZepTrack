@@ -47,5 +47,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV DB_PATH=/app/data/zeptrack.db
 
+# Health check
+HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+
 # Start the server
 CMD ["npx", "tsx", "server/index.ts"]
