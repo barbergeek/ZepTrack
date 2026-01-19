@@ -25,7 +25,21 @@ app.use((req, res, next) => {
 app.use('/api/entries', entriesRouter);
 app.use('/api/profile', profileRouter);
 
-// Health check
+// Health/Status check
+app.get('/api/status', (req, res) => {
+  const db = (req as any).db as Database;
+  const dbStatus = db.getStatus();
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: dbStatus,
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
+
+// Legacy health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', database: 'sqlite' });
 });

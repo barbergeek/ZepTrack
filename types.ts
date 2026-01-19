@@ -31,4 +31,4 @@ export interface Stats {
   goalWeight: number;
 }
 
-export type ViewState = 'dashboard' | 'history' | 'dosage' | 'bmi' | 'settings';
+export type ViewState = 'dashboard' | 'history' | 'dosage' | 'bmi' | 'settings' | 'status';

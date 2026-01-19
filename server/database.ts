@@ -267,6 +267,20 @@ export class Database {
     return row?.dosage || 0;
   }
 
+  getStatus(): { connected: boolean; path: string; entries: number; profiles: number } {
+    if (!this.db) {
+      return { connected: false, path: DB_PATH, entries: 0, profiles: 0 };
+    }
+
+    try {
+      const entriesCount = (this.db.prepare('SELECT COUNT(*) as count FROM weight_entries').get() as { count: number }).count;
+      const profilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
+      return { connected: true, path: DB_PATH, entries: entriesCount, profiles: profilesCount };
+    } catch {
+      return { connected: false, path: DB_PATH, entries: 0, profiles: 0 };
+    }
+  }
+
   close() {
     if (this.db) {
       this.db.close();

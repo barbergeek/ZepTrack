@@ -6,7 +6,13 @@ export default defineConfig({
   server: {
     port: 3010,
     host: true,
-    strictPort: true
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
   },
   build: {
     target: 'esnext',

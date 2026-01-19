@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, ShieldCheck, Pill, ArrowLeft, Target, User } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, Pill, ArrowLeft, Wifi } from 'lucide-react';
 import { WeightEntry, ViewState, Stats, UserProfile } from './types';
 import { getEntries, saveEntry, deleteEntry, deleteEntries, seedInitialData, exportData, importData, getProfile, saveProfile } from './services/storageService';
 import { StatCard, Card } from './components/ui/Card';
@@ -8,6 +8,7 @@ import { HistoryList } from './components/HistoryList';
 import { TrendChart } from './components/TrendChart';
 import { DosageChart } from './components/DosageChart';
 import { BMIChart } from './components/BMIChart';
+import { StatusPage } from './components/StatusPage';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('dashboard');
@@ -213,6 +214,23 @@ const App: React.FC = () => {
                 <input type="file" ref={fileInputRef} onChange={async (e) => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload= async (ev)=> { if(await importData(ev.target?.result as string)) { await refreshData(); setView('dashboard'); alert('Imported!'); }}; r.readAsText(f); }}} className="hidden" />
               </div>
             </Card>
+
+            <Card title="System">
+              <button onClick={() => setView('status')} className="w-full flex items-center justify-between p-4 border-2 border-slate-100 hover:border-brand-200 rounded-xl transition-all">
+                <div className="flex items-center gap-3">
+                  <Wifi className="text-slate-400" />
+                  <span className="font-bold text-sm">System Status</span>
+                </div>
+                <span className="text-xs text-slate-400">View connectivity &amp; health</span>
+              </button>
+            </Card>
+          </div>
+        )}
+
+        {view === 'status' && (
+          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
+            <button onClick={() => setView('settings')} className="flex items-center gap-2 text-slate-500 hover:text-brand-600 font-medium mb-2"><ArrowLeft size={18} /><span>Back to Settings</span></button>
+            <StatusPage />
           </div>
         )}
       </main>
