@@ -253,9 +253,38 @@ export class Database {
         CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
         CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(token);
         CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+        CREATE TABLE IF NOT EXISTS used_totp_codes (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          code TEXT NOT NULL,
+          used_at INTEGER NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_used_totp_user ON used_totp_codes(user_id, code);
       `);
 
       console.log('Auth schema migration complete');
+    }
+
+    // Check if used_totp_codes table exists
+    const hasUsedTOTPTable = this.db.prepare(
+      "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='used_totp_codes'"
+    ).get() as { count: number };
+
+    if (hasUsedTOTPTable.count === 0) {
+      console.log('Creating used_totp_codes table for replay protection...');
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS used_totp_codes (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          code TEXT NOT NULL,
+          used_at INTEGER NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_used_totp_user ON used_totp_codes(user_id, code);
+      `);
+      console.log('TOTP replay protection table created');
     }
   }
 
@@ -381,6 +410,41 @@ export class Database {
       now
     );
 
+    return this.findUserById(id)!;
+  }
+
+  // Atomically create user with admin role if they are the first user
+  createUserWithFirstAdminCheck(input: CreateUserInput): User {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const id = crypto.randomUUID();
+    const now = Date.now();
+
+    // Use transaction to ensure atomicity
+    const createUserTx = this.db.transaction(() => {
+      // Check user count within transaction
+      const count = (this.db!.prepare('SELECT COUNT(*) as count FROM users WHERE email IS NOT NULL').get() as { count: number }).count;
+      const role = count === 0 ? 'admin' : (input.role || 'user');
+
+      this.db!.prepare(`
+        INSERT INTO users (id, email, name, avatar_url, oauth_provider, oauth_id, role, invited_by, height_inches, target_weight, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+      `).run(
+        id,
+        input.email,
+        input.name || null,
+        input.avatarUrl || null,
+        input.oauthProvider || null,
+        input.oauthId || null,
+        role,
+        input.invitedBy || null,
+        now
+      );
+
+      return role;
+    });
+
+    createUserTx();
     return this.findUserById(id)!;
   }
 
@@ -512,6 +576,14 @@ export class Database {
     `).run(Date.now(), userId);
   }
 
+  revokeAllUserSessionsExcept(userId: string, exceptSessionId: string): void {
+    if (!this.db) return;
+
+    this.db.prepare(`
+      UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND id != ? AND revoked_at IS NULL
+    `).run(Date.now(), userId, exceptSessionId);
+  }
+
   // ========== MFA Methods ==========
 
   createMFAVerification(userId: string, codeHash: string, type: 'email' | 'totp'): MFAVerification {
@@ -590,6 +662,49 @@ export class Database {
     `).run(JSON.stringify(remainingCodes), userId);
 
     return true;
+  }
+
+  removeBackupCodeAtIndex(userId: string, index: number): void {
+    if (!this.db) return;
+
+    const user = this.findUserById(userId);
+    if (!user || !user.mfaBackupCodes) return;
+
+    const remainingCodes = user.mfaBackupCodes.filter((_, i) => i !== index);
+    this.db.prepare(`
+      UPDATE users SET mfa_backup_codes = ? WHERE id = ?
+    `).run(JSON.stringify(remainingCodes), userId);
+  }
+
+  // ========== TOTP Replay Protection ==========
+
+  isTOTPCodeUsed(userId: string, code: string): boolean {
+    if (!this.db) return false;
+
+    // Check if code was used in the last 60 seconds (2 TOTP windows)
+    const cutoff = Date.now() - 60 * 1000;
+    const row = this.db.prepare(`
+      SELECT id FROM used_totp_codes
+      WHERE user_id = ? AND code = ? AND used_at > ?
+    `).get(userId, code, cutoff);
+
+    return !!row;
+  }
+
+  markTOTPCodeUsed(userId: string, code: string): void {
+    if (!this.db) return;
+
+    const id = crypto.randomUUID();
+    this.db.prepare(`
+      INSERT INTO used_totp_codes (id, user_id, code, used_at)
+      VALUES (?, ?, ?, ?)
+    `).run(id, userId, code, Date.now());
+
+    // Cleanup old codes (older than 2 minutes)
+    const cleanupCutoff = Date.now() - 2 * 60 * 1000;
+    this.db.prepare(`
+      DELETE FROM used_totp_codes WHERE used_at < ?
+    `).run(cleanupCutoff);
   }
 
   // ========== Invite Methods ==========

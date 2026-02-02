@@ -119,7 +119,7 @@ app.use('/api/admin', authRequired, adminRequired, adminRouter);
 app.get('/api/config', (req, res) => {
   res.json({
     googleClientId: process.env.GOOGLE_CLIENT_ID || '',
-    appVersion: process.env.npm_package_version || '2.1.0',
+    appVersion: process.env.npm_package_version || '2.1.1',
   });
 });
 

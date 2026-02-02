@@ -3,13 +3,58 @@ import crypto from 'crypto';
 import { Database } from '../database';
 import { verifyGoogleToken } from '../services/oauth';
 import { signToken, hashToken, getExpiryMs } from '../services/jwt';
-import { generateTOTPSetup, verifyTOTP, generateEmailCode, hashCode, verifyCode, generateBackupCodes } from '../services/mfa';
+import { generateTOTPSetup, verifyTOTP, generateEmailCode, hashCode, verifyCode, generateBackupCodesWithHashes, verifyBackupCode } from '../services/mfa';
 import { sendMFACode } from '../services/email';
 import { authRequired, mfaPending } from '../middleware/auth';
 
 export const authRouter = Router();
 
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'zeptrack_session';
+
+// MFA rate limiting - track failed attempts per user
+const mfaAttempts = new Map<string, { count: number; blockedUntil: number }>();
+const MFA_MAX_ATTEMPTS = 5;
+const MFA_BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkMFARateLimit(userId: string): { allowed: boolean; remainingAttempts?: number; blockedUntil?: number } {
+  const now = Date.now();
+  const record = mfaAttempts.get(userId);
+
+  if (!record) {
+    return { allowed: true, remainingAttempts: MFA_MAX_ATTEMPTS };
+  }
+
+  if (now < record.blockedUntil) {
+    return { allowed: false, blockedUntil: record.blockedUntil };
+  }
+
+  // Reset if block expired
+  if (now >= record.blockedUntil) {
+    mfaAttempts.delete(userId);
+    return { allowed: true, remainingAttempts: MFA_MAX_ATTEMPTS };
+  }
+
+  return { allowed: true, remainingAttempts: MFA_MAX_ATTEMPTS - record.count };
+}
+
+function recordMFAFailure(userId: string): void {
+  const now = Date.now();
+  const record = mfaAttempts.get(userId);
+
+  if (!record || now >= record.blockedUntil) {
+    mfaAttempts.set(userId, { count: 1, blockedUntil: 0 });
+    return;
+  }
+
+  record.count++;
+  if (record.count >= MFA_MAX_ATTEMPTS) {
+    record.blockedUntil = now + MFA_BLOCK_DURATION_MS;
+  }
+}
+
+function clearMFAAttempts(userId: string): void {
+  mfaAttempts.delete(userId);
+}
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -47,17 +92,14 @@ authRouter.post('/google', async (req, res) => {
         invite = db.findInviteByEmail(googleUser.email);
       }
 
-      // Check if this is the first user - make them admin
-      const isFirstUser = db.getAllUsers().length === 0;
-
-      // Create new user
-      user = db.createUser({
+      // Create new user (atomically assigns admin to first user)
+      user = db.createUserWithFirstAdminCheck({
         email: googleUser.email,
         name: googleUser.name,
         avatarUrl: googleUser.picture,
         oauthProvider: 'google',
         oauthId: googleUser.sub,
-        role: isFirstUser ? 'admin' : (invite?.role || 'user'),
+        role: invite?.role || 'user',
         invitedBy: invite?.invitedBy,
       });
 
@@ -89,6 +131,16 @@ authRouter.post('/google', async (req, res) => {
       role: user.role,
       mfaVerified: false,
       sessionId,
+    });
+
+    // Create MFA pending session (short expiry - 10 minutes)
+    db.createSession({
+      id: sessionId,
+      userId: user.id,
+      tokenHash: hashToken(token),
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minute expiry for MFA pending
     });
 
     res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
@@ -211,14 +263,14 @@ authRouter.post('/mfa/setup/totp/verify', authRequired, async (req, res) => {
     return res.status(400).json({ error: 'Invalid verification code' });
   }
 
-  // Generate backup codes and enable MFA
-  const backupCodes = generateBackupCodes();
-  db.saveMFASecret(user.id, user.mfaSecret, backupCodes);
+  // Generate backup codes (hashed for storage, plain for user)
+  const { plainCodes, hashedCodes } = await generateBackupCodesWithHashes();
+  db.saveMFASecret(user.id, user.mfaSecret, hashedCodes);
   db.enableMFA(user.id, 'totp');
 
   res.json({
     success: true,
-    backupCodes,
+    backupCodes: plainCodes, // Send plain codes to user
   });
 });
 
@@ -230,14 +282,14 @@ authRouter.post('/mfa/setup/email', authRequired, async (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // Generate backup codes and enable MFA
-  const backupCodes = generateBackupCodes();
-  db.saveMFASecret(user.id, '', backupCodes);
+  // Generate backup codes (hashed for storage, plain for user)
+  const { plainCodes, hashedCodes } = await generateBackupCodesWithHashes();
+  db.saveMFASecret(user.id, '', hashedCodes);
   db.enableMFA(user.id, 'email');
 
   res.json({
     success: true,
-    backupCodes,
+    backupCodes: plainCodes, // Send plain codes to user
   });
 });
 
@@ -245,6 +297,8 @@ authRouter.post('/mfa/setup/email', authRequired, async (req, res) => {
 authRouter.post('/mfa/disable', authRequired, (req, res) => {
   const db: Database = (req as any).db;
   db.disableMFA(req.userId!);
+  // Revoke all sessions except current one for security
+  db.revokeAllUserSessionsExcept(req.userId!, req.sessionId!);
   res.json({ success: true });
 });
 
@@ -286,11 +340,26 @@ authRouter.post('/mfa/verify', mfaPending, async (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  // Check rate limiting
+  const rateLimit = checkMFARateLimit(user.id);
+  if (!rateLimit.allowed) {
+    const retryAfter = Math.ceil((rateLimit.blockedUntil! - Date.now()) / 1000);
+    return res.status(429).json({
+      error: 'Too many failed attempts. Please try again later.',
+      retryAfter,
+    });
+  }
+
   let verified = false;
 
   if (user.mfaMethod === 'totp') {
-    // Verify TOTP code
+    // Verify TOTP code with replay protection
     if (user.mfaSecret && await verifyTOTP(user.mfaSecret, code)) {
+      // Check if code was already used (replay attack prevention)
+      if (db.isTOTPCodeUsed(user.id, code)) {
+        return res.status(400).json({ error: 'This code has already been used. Please wait for a new code.' });
+      }
+      db.markTOTPCodeUsed(user.id, code);
       verified = true;
     }
   } else if (user.mfaMethod === 'email') {
@@ -302,13 +371,31 @@ authRouter.post('/mfa/verify', mfaPending, async (req, res) => {
     }
   }
 
-  // Check backup codes if not verified
-  if (!verified && db.useBackupCode(user.id, code.toUpperCase())) {
-    verified = true;
+  // Check backup codes if not verified (backup codes are hashed)
+  if (!verified && user.mfaBackupCodes && user.mfaBackupCodes.length > 0) {
+    const backupIndex = await verifyBackupCode(code, user.mfaBackupCodes);
+    if (backupIndex >= 0) {
+      // Remove used backup code
+      db.removeBackupCodeAtIndex(user.id, backupIndex);
+      verified = true;
+    }
   }
 
   if (!verified) {
-    return res.status(400).json({ error: 'Invalid verification code' });
+    recordMFAFailure(user.id);
+    const remaining = MFA_MAX_ATTEMPTS - (mfaAttempts.get(user.id)?.count || 0);
+    return res.status(400).json({
+      error: 'Invalid verification code',
+      remainingAttempts: Math.max(0, remaining),
+    });
+  }
+
+  // Clear rate limit on success
+  clearMFAAttempts(user.id);
+
+  // Revoke the pending MFA session
+  if (req.sessionId) {
+    db.revokeSession(req.sessionId);
   }
 
   // Issue full session token

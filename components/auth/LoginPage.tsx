@@ -40,7 +40,7 @@ export function LoginPage({ inviteToken }: LoginPageProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [appVersion, setAppVersion] = useState<string>('2.0.0');
+  const [appVersion, setAppVersion] = useState<string>('2.1.1');
 
   useEffect(() => {
     if (initializedRef.current) return;

@@ -58,3 +58,26 @@ export function generateBackupCodes(count: number = 8): string[] {
     crypto.randomBytes(4).toString('hex').toUpperCase()
   );
 }
+
+export interface BackupCodesResult {
+  plainCodes: string[];
+  hashedCodes: string[];
+}
+
+export async function generateBackupCodesWithHashes(count: number = 8): Promise<BackupCodesResult> {
+  const plainCodes = generateBackupCodes(count);
+  const hashedCodes = await Promise.all(
+    plainCodes.map(code => bcrypt.hash(code, 10))
+  );
+  return { plainCodes, hashedCodes };
+}
+
+export async function verifyBackupCode(code: string, hashedCodes: string[]): Promise<number> {
+  // Returns the index of the matched code, or -1 if no match
+  for (let i = 0; i < hashedCodes.length; i++) {
+    if (await bcrypt.compare(code.toUpperCase(), hashedCodes[i])) {
+      return i;
+    }
+  }
+  return -1;
+}
