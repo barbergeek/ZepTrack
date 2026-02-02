@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 declare global {
   interface Window {
@@ -37,46 +39,68 @@ export function LoginPage({ inviteToken }: LoginPageProps) {
   const { login, isLoading, error } = useAuth();
   const buttonRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
-  const [configError, setConfigError] = React.useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string>('2.0.0');
 
   useEffect(() => {
     if (initializedRef.current) return;
 
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      setConfigError('Google OAuth is not configured. Please set VITE_GOOGLE_CLIENT_ID in your environment.');
-      return;
-    }
+    const loadConfigAndInitialize = async () => {
+      // Fetch runtime config from server
+      let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    const initializeGoogle = () => {
-      if (!window.google?.accounts?.id) {
-        setTimeout(initializeGoogle, 100);
+      try {
+        const response = await fetch(`${API_BASE_URL}/config`);
+        if (response.ok) {
+          const config = await response.json();
+          if (config.googleClientId) {
+            clientId = config.googleClientId;
+          }
+          if (config.appVersion) {
+            setAppVersion(config.appVersion);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch runtime config, using build-time values');
+      }
+
+      if (!clientId) {
+        setConfigError('Google OAuth is not configured. Please set GOOGLE_CLIENT_ID in your environment.');
         return;
       }
 
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async (response) => {
-          if (response.credential) {
-            await login(response.credential, inviteToken);
-          }
-        },
-      });
+      const initializeGoogle = () => {
+        if (!window.google?.accounts?.id) {
+          setTimeout(initializeGoogle, 100);
+          return;
+        }
 
-      if (buttonRef.current) {
-        window.google.accounts.id.renderButton(buttonRef.current, {
-          theme: 'filled_blue',
-          size: 'large',
-          text: 'continue_with',
-          shape: 'rectangular',
-          width: 280,
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response) => {
+            if (response.credential) {
+              await login(response.credential, inviteToken);
+            }
+          },
         });
-      }
 
-      initializedRef.current = true;
+        if (buttonRef.current) {
+          window.google.accounts.id.renderButton(buttonRef.current, {
+            theme: 'filled_blue',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'rectangular',
+            width: 280,
+          });
+        }
+
+        initializedRef.current = true;
+      };
+
+      initializeGoogle();
     };
 
-    initializeGoogle();
+    loadConfigAndInitialize();
   }, [login, inviteToken]);
 
   return (
@@ -128,7 +152,7 @@ export function LoginPage({ inviteToken }: LoginPageProps) {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-6">
-          ZepTrack v{import.meta.env.VITE_APP_VERSION || '2.0.0'}
+          ZepTrack v{appVersion}
         </p>
       </div>
     </div>

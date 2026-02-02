@@ -115,6 +115,14 @@ app.use('/api/profile', authRequired, profileRouter);
 // Admin API Routes (admin role required)
 app.use('/api/admin', authRequired, adminRequired, adminRouter);
 
+// Public configuration for frontend (runtime config)
+app.get('/api/config', (req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    appVersion: process.env.npm_package_version || '2.1.0',
+  });
+});
+
 // Health/Status check (public)
 app.get('/api/status', (req, res) => {
   const dbInstance = (req as any).db as Database;
