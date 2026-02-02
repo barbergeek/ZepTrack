@@ -37,13 +37,14 @@ export function LoginPage({ inviteToken }: LoginPageProps) {
   const { login, isLoading, error } = useAuth();
   const buttonRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  const [configError, setConfigError] = React.useState<string | null>(null);
 
   useEffect(() => {
     if (initializedRef.current) return;
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      console.error('Google Client ID not configured');
+      setConfigError('Google OAuth is not configured. Please set VITE_GOOGLE_CLIENT_ID in your environment.');
       return;
     }
 
@@ -94,9 +95,9 @@ export function LoginPage({ inviteToken }: LoginPageProps) {
           </div>
 
           {/* Error message */}
-          {error && (
+          {(error || configError) && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-              {error}
+              {error || configError}
             </div>
           )}
 
