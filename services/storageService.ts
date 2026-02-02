@@ -15,7 +15,7 @@ export const generateId = (): string => {
 
 export const getEntries = async (): Promise<WeightEntry[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/entries`);
+    const response = await fetch(`${API_BASE_URL}/entries`, { credentials: 'include' });
     if (!response.ok) throw new Error('Failed to fetch entries');
     return await response.json();
   } catch (e) {
@@ -29,6 +29,7 @@ export const saveEntry = async (entry: WeightEntry): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/entries`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(entry)
     });
     if (!response.ok) throw new Error('Failed to save entry');
@@ -41,7 +42,8 @@ export const saveEntry = async (entry: WeightEntry): Promise<void> => {
 export const deleteEntry = async (id: string): Promise<void> => {
   try {
     const response = await fetch(`${API_BASE_URL}/entries/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
     if (!response.ok) throw new Error('Failed to delete entry');
   } catch (e) {
@@ -55,6 +57,7 @@ export const deleteEntries = async (ids: string[]): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/entries/delete-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ ids })
     });
     if (!response.ok) throw new Error('Failed to delete entries');
@@ -66,7 +69,7 @@ export const deleteEntries = async (ids: string[]): Promise<void> => {
 
 export const getProfile = async (): Promise<UserProfile> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/profile`);
+    const response = await fetch(`${API_BASE_URL}/profile`, { credentials: 'include' });
     if (!response.ok) return { heightInches: 67, targetWeight: 180 };
     return await response.json();
   } catch (e) {
@@ -80,6 +83,7 @@ export const saveProfile = async (profile: UserProfile): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(profile)
     });
     if (!response.ok) throw new Error('Failed to save profile');
@@ -91,7 +95,7 @@ export const saveProfile = async (profile: UserProfile): Promise<void> => {
 
 export const getLastDosage = async (): Promise<number> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/entries/meta/last-dosage`);
+    const response = await fetch(`${API_BASE_URL}/entries/meta/last-dosage`, { credentials: 'include' });
     if (!response.ok) return 2.5;
     const data = await response.json();
     return data.dosage || 2.5;

@@ -1,8 +1,12 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { Database } from './database';
 import { entriesRouter } from './routes/entries';
 import { profileRouter } from './routes/profile';
+import { authRouter } from './routes/auth';
+import { adminRouter } from './routes/admin';
+import { authRequired, adminRequired } from './middleware/auth';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,7 +78,15 @@ const securityHeaders = (req: express.Request, res: express.Response, next: expr
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://esm.sh");
+    res.setHeader('Content-Security-Policy', [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://esm.sh https://accounts.google.com/gsi/client",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: https://lh3.googleusercontent.com",
+      "frame-src https://accounts.google.com",
+      "connect-src 'self' https://esm.sh https://accounts.google.com https://oauth2.googleapis.com"
+    ].join('; '));
   }
   next();
 };
@@ -83,6 +95,7 @@ const securityHeaders = (req: express.Request, res: express.Response, next: expr
 app.use(rateLimitMiddleware);
 app.use(securityHeaders);
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
 // Make database available to routes
@@ -91,11 +104,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Routes
-app.use('/api/entries', entriesRouter);
-app.use('/api/profile', profileRouter);
+// Public API Routes (no auth required)
+app.use('/api/auth', authRouter);
 
-// Health/Status check (does not expose database path)
+// Protected API Routes (auth required)
+app.use('/api/entries', authRequired, entriesRouter);
+app.use('/api/profile', authRequired, profileRouter);
+
+// Admin API Routes (admin role required)
+app.use('/api/admin', authRequired, adminRequired, adminRouter);
+
+// Health/Status check (public)
 app.get('/api/status', (req, res) => {
   const dbInstance = (req as any).db as Database;
   const dbStatus = dbInstance.getStatus();

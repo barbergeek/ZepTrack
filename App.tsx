@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, Pill, ArrowLeft, Wifi } from 'lucide-react';
+import { Plus, LayoutDashboard, History, Activity, Settings, Download, Upload, Pill, ArrowLeft, Wifi, LogOut, Shield, Users } from 'lucide-react';
 import { WeightEntry, ViewState, Stats, UserProfile } from './types';
-import { getEntries, saveEntry, deleteEntry, deleteEntries, seedInitialData, exportData, importData, getProfile, saveProfile } from './services/storageService';
+import { getEntries, saveEntry, deleteEntry, deleteEntries, exportData, importData, getProfile, saveProfile } from './services/storageService';
 import { StatCard, Card } from './components/ui/Card';
 import { EntryModal } from './components/EntryModal';
 import { HistoryList } from './components/HistoryList';
@@ -9,24 +9,39 @@ import { TrendChart } from './components/TrendChart';
 import { DosageChart } from './components/DosageChart';
 import { BMIChart } from './components/BMIChart';
 import { StatusPage } from './components/StatusPage';
+import { useAuth } from './contexts/AuthContext';
+import { LoginPage } from './components/auth/LoginPage';
+import { MFAVerify } from './components/auth/MFAVerify';
+import { MFASetup } from './components/auth/MFASetup';
+import { AdminPanel } from './components/auth/AdminPanel';
+import * as authService from './services/authService';
 
 const App: React.FC = () => {
+  const { user, isAuthenticated, isLoading: authLoading, mfaRequired, mfaMethod, logout, refreshUser } = useAuth();
   const [view, setView] = useState<ViewState>('dashboard');
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [profile, setProfile] = useState<UserProfile>({ heightInches: 67, targetWeight: 180 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WeightEntry | null>(null);
+  const [showMFASetup, setShowMFASetup] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Get invite token from URL if present
+  const inviteToken = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('invite') || undefined;
+  }, []);
+
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const initData = async () => {
-      await seedInitialData();
       await refreshData();
       const loadedProfile = await getProfile();
       setProfile(loadedProfile);
     };
     initData();
-  }, []);
+  }, [isAuthenticated]);
 
   const refreshData = async () => {
     const data = await getEntries();
@@ -52,6 +67,25 @@ const App: React.FC = () => {
     alert('Profile saved!');
   };
 
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to sign out?')) {
+      await logout();
+    }
+  };
+
+  const handleDisableMFA = async () => {
+    if (!confirm('Are you sure you want to disable two-factor authentication? This will make your account less secure.')) {
+      return;
+    }
+    const result = await authService.disableMFA();
+    if (result.success) {
+      await refreshUser();
+      alert('MFA has been disabled');
+    } else {
+      alert(result.error || 'Failed to disable MFA');
+    }
+  };
+
   const stats: Stats = useMemo(() => {
     if (entries.length === 0) {
       return { currentWeight: 0, startWeight: 0, totalLoss: 0, currentDosage: 0, lowestWeight: 0, highestWeight: 0, bmi: 0, progressPercent: 0, goalWeight: profile.targetWeight };
@@ -59,10 +93,10 @@ const App: React.FC = () => {
     const current = entries[0];
     const start = entries[entries.length - 1];
     const weights = entries.map(e => e.weight);
-    
+
     // BMI Calculation: (weight / height^2) * 703
-    const bmi = profile.heightInches > 0 
-      ? Number(((current.weight / Math.pow(profile.heightInches, 2)) * 703).toFixed(1)) 
+    const bmi = profile.heightInches > 0
+      ? Number(((current.weight / Math.pow(profile.heightInches, 2)) * 703).toFixed(1))
       : 0;
 
     // Progress percentage: (Start - Current) / (Start - Goal)
@@ -83,6 +117,28 @@ const App: React.FC = () => {
     };
   }, [entries, profile]);
 
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mx-auto"></div>
+          <p className="mt-4 text-slate-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show MFA verification if required
+  if (mfaRequired) {
+    return <MFAVerify onCancel={() => logout()} preferredMethod={mfaMethod || 'totp'} />;
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage inviteToken={inviteToken} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-0">
       <nav className="bg-white border-b border-slate-100 sticky top-0 z-30">
@@ -95,6 +151,20 @@ const App: React.FC = () => {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">ZepTrack</h1>
             </div>
             <div className="flex items-center gap-4">
+              {user && (
+                <div className="hidden sm:flex items-center gap-2">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
+                      <span className="text-sm font-bold text-brand-600">
+                        {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-sm text-slate-600">{user.name || user.email}</span>
+                </div>
+              )}
               <button onClick={() => setView('settings')} className={`p-2 rounded-lg transition-colors ${view === 'settings' ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600'}`}>
                 <Settings size={20} />
               </button>
@@ -180,13 +250,13 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {view === 'settings' && (
+        {view === 'settings' && !showMFASetup && (
           <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-left-8 duration-300">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
               <button onClick={() => setView('dashboard')} className="text-sm font-bold text-brand-600 uppercase">Done</button>
             </div>
-            
+
             <Card title="Personal Profile">
               <form onSubmit={handleUpdateProfile} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -207,6 +277,51 @@ const App: React.FC = () => {
               </form>
             </Card>
 
+            <Card title="Security">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border-2 border-slate-100 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Shield className="text-slate-400" />
+                    <div>
+                      <span className="font-bold text-sm block">Two-Factor Authentication</span>
+                      <span className="text-xs text-slate-500">
+                        {user?.mfaEnabled
+                          ? `Enabled (${user.mfaMethod === 'totp' ? 'Authenticator App' : 'Email'})`
+                          : 'Add an extra layer of security'}
+                      </span>
+                    </div>
+                  </div>
+                  {user?.mfaEnabled ? (
+                    <button
+                      onClick={handleDisableMFA}
+                      className="text-sm font-medium text-red-600 hover:text-red-800"
+                    >
+                      Disable
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowMFASetup(true)}
+                      className="text-sm font-medium text-brand-600 hover:text-brand-800"
+                    >
+                      Enable
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {user?.role === 'admin' && (
+              <Card title="Administration">
+                <button onClick={() => setView('admin')} className="w-full flex items-center justify-between p-4 border-2 border-slate-100 hover:border-brand-200 rounded-xl transition-all">
+                  <div className="flex items-center gap-3">
+                    <Users className="text-slate-400" />
+                    <span className="font-bold text-sm">User Management</span>
+                  </div>
+                  <span className="text-xs text-slate-400">Invite users, manage roles</span>
+                </button>
+              </Card>
+            )}
+
             <Card title="Data Backup">
               <div className="grid grid-cols-2 gap-4">
                 <button onClick={async () => { const d = await exportData(); const blob = new Blob([d], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'zeptrack_backup.json'; a.click(); }} className="flex flex-col items-center p-6 border-2 border-slate-100 hover:border-brand-200 rounded-2xl gap-3 transition-all"><Download className="text-slate-400" /> <span className="font-bold text-sm">Export JSON</span></button>
@@ -216,14 +331,45 @@ const App: React.FC = () => {
             </Card>
 
             <Card title="System">
-              <button onClick={() => setView('status')} className="w-full flex items-center justify-between p-4 border-2 border-slate-100 hover:border-brand-200 rounded-xl transition-all">
-                <div className="flex items-center gap-3">
-                  <Wifi className="text-slate-400" />
-                  <span className="font-bold text-sm">System Status</span>
-                </div>
-                <span className="text-xs text-slate-400">View connectivity &amp; health</span>
+              <div className="space-y-2">
+                <button onClick={() => setView('status')} className="w-full flex items-center justify-between p-4 border-2 border-slate-100 hover:border-brand-200 rounded-xl transition-all">
+                  <div className="flex items-center gap-3">
+                    <Wifi className="text-slate-400" />
+                    <span className="font-bold text-sm">System Status</span>
+                  </div>
+                  <span className="text-xs text-slate-400">View connectivity &amp; health</span>
+                </button>
+              </div>
+            </Card>
+
+            <Card title="Account">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 p-4 border-2 border-red-100 hover:border-red-200 hover:bg-red-50 rounded-xl text-red-600 transition-all"
+              >
+                <LogOut size={18} />
+                <span className="font-bold text-sm">Sign Out</span>
               </button>
             </Card>
+          </div>
+        )}
+
+        {view === 'settings' && showMFASetup && user && (
+          <div className="max-w-md mx-auto animate-in fade-in slide-in-from-right-8 duration-300">
+            <MFASetup
+              user={user}
+              onComplete={async () => {
+                await refreshUser();
+                setShowMFASetup(false);
+              }}
+              onCancel={() => setShowMFASetup(false)}
+            />
+          </div>
+        )}
+
+        {view === 'admin' && (
+          <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-right-8 duration-300">
+            <AdminPanel onBack={() => setView('settings')} />
           </div>
         )}
 

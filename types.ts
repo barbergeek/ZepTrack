@@ -31,4 +31,40 @@ export interface Stats {
   goalWeight: number;
 }
 
-export type ViewState = 'dashboard' | 'history' | 'dosage' | 'bmi' | 'settings' | 'status';
+export type ViewState = 'dashboard' | 'history' | 'dosage' | 'bmi' | 'settings' | 'status' | 'admin';
+
+// Auth types
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  role: 'user' | 'admin';
+  mfaEnabled: boolean;
+  mfaMethod?: 'totp' | 'email';
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  mfaRequired: boolean;
+  mfaMethod?: 'totp' | 'email';
+  error: string | null;
+}
+
+export interface TOTPSetupData {
+  secret: string;
+  qrCodeDataUrl: string;
+}
+
+export interface InviteUser {
+  id: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  role: 'user' | 'admin';
+  mfaEnabled: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+}

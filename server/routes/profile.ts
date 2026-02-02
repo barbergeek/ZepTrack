@@ -7,7 +7,7 @@ export const profileRouter = Router();
 // Get profile
 profileRouter.get('/', (req, res) => {
   const db: Database = (req as any).db;
-  const profile = db.getProfile();
+  const profile = db.getProfile(req.userId!);
 
   if (!profile) {
     return res.status(404).json({ error: 'Profile not found' });
@@ -26,7 +26,7 @@ profileRouter.post('/', (req, res) => {
   }
 
   try {
-    const profile = db.saveProfile('default-user', validation.data);
+    const profile = db.saveProfile(req.userId!, validation.data);
     res.json(profile);
   } catch (error) {
     res.status(500).json({ error: 'Failed to save profile' });

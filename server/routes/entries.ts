@@ -15,21 +15,21 @@ function generateId(): string {
 // Get all entries
 entriesRouter.get('/', (req, res) => {
   const db: Database = (req as any).db;
-  const entries = db.getEntries();
+  const entries = db.getEntries(req.userId!);
   res.json(entries);
 });
 
 // Get last dosage - must be before /:id route
 entriesRouter.get('/meta/last-dosage', (req, res) => {
   const db: Database = (req as any).db;
-  const dosage = db.getLastDosage();
+  const dosage = db.getLastDosage(req.userId!);
   res.json({ dosage });
 });
 
 // Get single entry
 entriesRouter.get('/:id', (req, res) => {
   const db: Database = (req as any).db;
-  const entry = db.getEntry(req.params.id);
+  const entry = db.getEntry(req.params.id, req.userId!);
 
   if (!entry) {
     return res.status(404).json({ error: 'Entry not found' });
@@ -53,7 +53,7 @@ entriesRouter.post('/', (req, res) => {
       id: validation.data.id || generateId(),
       createdAt: validation.data.createdAt || Date.now()
     };
-    const entry = db.saveEntry(entryData);
+    const entry = db.saveEntry(entryData, req.userId!);
     res.json(entry);
   } catch (error) {
     res.status(500).json({ error: 'Failed to save entry' });
@@ -75,7 +75,7 @@ entriesRouter.put('/:id', (req, res) => {
       id: req.params.id,
       createdAt: validation.data.createdAt || Date.now()
     };
-    const entry = db.saveEntry(entryData);
+    const entry = db.saveEntry(entryData, req.userId!);
     res.json(entry);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update entry' });
@@ -85,7 +85,7 @@ entriesRouter.put('/:id', (req, res) => {
 // Delete single entry
 entriesRouter.delete('/:id', (req, res) => {
   const db: Database = (req as any).db;
-  const success = db.deleteEntry(req.params.id);
+  const success = db.deleteEntry(req.params.id, req.userId!);
 
   if (!success) {
     return res.status(404).json({ error: 'Entry not found' });
@@ -103,6 +103,6 @@ entriesRouter.post('/delete-batch', (req, res) => {
     return res.status(400).json({ error: validation.message });
   }
 
-  const deletedCount = db.deleteEntries(validation.data);
+  const deletedCount = db.deleteEntries(validation.data, req.userId!);
   res.json({ deletedCount });
 });
