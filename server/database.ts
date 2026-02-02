@@ -259,6 +259,52 @@ export class Database {
     }
   }
 
+  // Find legacy user (user without email) that has data
+  findLegacyUser(): { id: string; heightInches: number; targetWeight: number } | null {
+    if (!this.db) return null;
+
+    const row = this.db.prepare(`
+      SELECT id, height_inches as heightInches, target_weight as targetWeight
+      FROM users
+      WHERE email IS NULL
+      LIMIT 1
+    `).get() as { id: string; heightInches: number; targetWeight: number } | undefined;
+
+    return row || null;
+  }
+
+  // Migrate legacy user data to a new user account
+  migrateLegacyUserTo(legacyUserId: string, newUserId: string): void {
+    if (!this.db) return;
+
+    // Get legacy user's profile data
+    const legacyProfile = this.db.prepare(`
+      SELECT height_inches, target_weight, name FROM users WHERE id = ?
+    `).get(legacyUserId) as { height_inches: number; target_weight: number; name?: string } | undefined;
+
+    if (legacyProfile) {
+      // Update new user with legacy profile data
+      this.db.prepare(`
+        UPDATE users SET
+          height_inches = ?,
+          target_weight = ?,
+          name = COALESCE(name, ?)
+        WHERE id = ?
+      `).run(legacyProfile.height_inches, legacyProfile.target_weight, legacyProfile.name, newUserId);
+    }
+
+    // Transfer all entries from legacy user to new user
+    const result = this.db.prepare(`
+      UPDATE weight_entries SET user_id = ? WHERE user_id = ?
+    `).run(newUserId, legacyUserId);
+
+    console.log(`Migrated ${result.changes} entries from legacy user ${legacyUserId} to ${newUserId}`);
+
+    // Delete the legacy user (no longer needed)
+    this.db.prepare('DELETE FROM users WHERE id = ?').run(legacyUserId);
+    console.log(`Deleted legacy user ${legacyUserId}`);
+  }
+
   // ========== User Auth Methods ==========
 
   private rowToUser(row: UserRow): User {

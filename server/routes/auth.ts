@@ -61,6 +61,15 @@ authRouter.post('/google', async (req, res) => {
         invitedBy: invite?.invitedBy,
       });
 
+      // Check for legacy user data to migrate (users created before auth system)
+      const legacyUser = db.findLegacyUser();
+      if (legacyUser && legacyUser.id !== user.id) {
+        console.log(`Migrating legacy user data to ${googleUser.email}`);
+        db.migrateLegacyUserTo(legacyUser.id, user.id);
+        // Refresh user to get migrated profile data
+        user = db.findUserById(user.id)!;
+      }
+
       if (invite) {
         db.acceptInvite(invite.id);
       }
