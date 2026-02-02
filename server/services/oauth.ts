@@ -21,7 +21,7 @@ export interface GoogleUserInfo {
 
 export async function verifyGoogleToken(idToken: string): Promise<GoogleUserInfo | null> {
   if (!GOOGLE_CLIENT_ID) {
-    console.error('GOOGLE_CLIENT_ID not configured');
+    console.error('GOOGLE_CLIENT_ID environment variable not configured on server');
     return null;
   }
 
@@ -31,7 +31,10 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleUserInfo
       audience: GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    if (!payload) return null;
+    if (!payload) {
+      console.error('Google token payload is empty');
+      return null;
+    }
 
     return {
       sub: payload.sub!,
@@ -40,8 +43,11 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleUserInfo
       name: payload.name || payload.email!,
       picture: payload.picture || '',
     };
-  } catch (error) {
-    console.error('Google token verification failed:', error);
+  } catch (error: any) {
+    console.error('Google token verification failed:', error?.message || error);
+    if (error?.message?.includes('audience')) {
+      console.error('Token audience mismatch - ensure GOOGLE_CLIENT_ID matches the client ID used in the frontend');
+    }
     return null;
   }
 }

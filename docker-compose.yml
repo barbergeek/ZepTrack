@@ -11,6 +11,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DB_PATH=/app/data/zeptrack.db
+      - VITE_GOOGLE_CLIENT_ID=379490475768-l17qnpu8grdr5ok3eti36rdbtsq900a9.apps.googleusercontent.com
+      - GOOGLE_CLIENT_ID=379490475768-l17qnpu8grdr5ok3eti36rdbtsq900a9.apps.googleusercontent.com
+      - JWT_SECRET=3a93e46fa2b18a6de1a09358e8ac9012341ddaf23
     restart: unless-stopped
 
 volumes:
