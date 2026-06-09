@@ -14,6 +14,7 @@ interface StatusData {
   };
   environment: string;
   version: string;
+  nodeVersion: string;
 }
 
 interface StatusItemProps {
@@ -147,6 +148,10 @@ export const StatusPage: React.FC = () => {
         <StatusItem
           label="Version"
           value={statusData?.version || 'Unknown'}
+        />
+        <StatusItem
+          label="Node.js"
+          value={statusData?.nodeVersion || 'Unknown'}
         />
       </Card>
 

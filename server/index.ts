@@ -137,7 +137,8 @@ app.get('/api/status', (req, res) => {
       profiles: dbStatus.profiles
     },
     environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
+    nodeVersion: process.version
   });
 });
 
