@@ -231,6 +231,7 @@ docker run -d -p 3000:3000 -v zeptrack-data:/app/data \
 
 ## Version History
 
+- **2.3.1**: Security — resolved 14 npm audit vulnerabilities (nodemailer, concurrently, vite, and transitive deps)
 - **2.3.0**: Upgrade to Node.js 22; Node.js version shown in System Status
 - **2.2.0**: iOS Safari auto-zoom fix; automated Docker publishing via GitHub Actions
 - **2.1.1**: Security hardening — MFA rate limiting, TOTP replay protection, hashed backup codes, session management improvements
