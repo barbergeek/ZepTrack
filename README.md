@@ -34,7 +34,7 @@ ZepTrack is a modern, responsive web application designed to track weight loss p
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - A Google Cloud project with OAuth 2.0 credentials configured
 
 ### Environment Variables
@@ -78,21 +78,33 @@ DB_PATH=./data/zeptrack.db
 
 ### Docker Deployment
 
-The easiest way to deploy ZepTrack is using Docker:
+#### Using the Pre-built Image (Recommended)
 
-1. **Set Environment Variables**:
-   ```bash
-   export GOOGLE_CLIENT_ID=your-google-oauth-client-id
-   export JWT_SECRET=$(openssl rand -hex 32)
-   ```
+Images are published automatically to GitHub Container Registry on every release.
 
-   Or create a `.env` file in the same directory as docker-compose.yml:
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -v zeptrack-data:/app/data \
+  -e GOOGLE_CLIENT_ID=your-client-id \
+  -e JWT_SECRET=$(openssl rand -hex 32) \
+  ghcr.io/barbergeek/zeptrack:latest
+```
+
+Available tags:
+- `latest` — most recent build from main
+- `2.3.0`, `2.3` — specific release versions
+- `YYYY-MM-DD` — date-stamped builds
+
+#### Using Docker Compose
+
+1. **Create a `.env` file**:
    ```bash
    GOOGLE_CLIENT_ID=your-google-oauth-client-id
-   JWT_SECRET=your-64-char-hex-secret
+   JWT_SECRET=$(openssl rand -hex 32)
    ```
 
-2. **Build and Run with Docker Compose**:
+2. **Run**:
    ```bash
    docker-compose up -d
    ```
@@ -105,20 +117,19 @@ The easiest way to deploy ZepTrack is using Docker:
    docker-compose logs -f
    ```
 
-5. **Stop the Application**:
+5. **Stop**:
    ```bash
    docker-compose down
    ```
 
-### Using Pre-built Docker Image
+#### Building Locally
 
 ```bash
-docker run -d \
-  -p 3000:3000 \
-  -v zeptrack-data:/app/data \
+docker build -t zeptrack .
+docker run -d -p 3000:3000 -v zeptrack-data:/app/data \
   -e GOOGLE_CLIENT_ID=your-client-id \
   -e JWT_SECRET=$(openssl rand -hex 32) \
-  scotthoge/zeptrack:latest
+  zeptrack
 ```
 
 ## Configuration
@@ -176,7 +187,7 @@ docker run -d \
 ### Public Endpoints
 - `GET /api/config` - Runtime configuration (Google Client ID, app version)
 - `GET /api/health` - Health check
-- `GET /api/status` - Detailed status including database info
+- `GET /api/status` - Detailed status including database info and Node.js version
 - `POST /api/auth/google` - Google OAuth login
 - `POST /api/auth/logout` - Logout
 
@@ -204,18 +215,25 @@ docker run -d \
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite 6
-- **Backend**: Node.js, Express, TypeScript
+- **Backend**: Node.js 22, Express, TypeScript
 - **Database**: SQLite (better-sqlite3)
 - **Authentication**: Google OAuth 2.0, JWT, bcrypt
 - **MFA**: otplib (TOTP), QRCode generation
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 - **Charts**: Recharts
-- **Container**: Docker
+- **Container**: Docker (node:22-alpine), published to ghcr.io
+
+## CI/CD
+
+- **Code Review**: Claude automatically reviews every pull request
+- **Docker Publish**: Images built and pushed to `ghcr.io/barbergeek/zeptrack` on every push to main and version tags
 
 ## Version History
 
-- **2.1.1**: Security hardening - MFA rate limiting, TOTP replay protection, hashed backup codes, session management improvements
+- **2.3.0**: Upgrade to Node.js 22; Node.js version shown in System Status
+- **2.2.0**: iOS Safari auto-zoom fix; automated Docker publishing via GitHub Actions
+- **2.1.1**: Security hardening — MFA rate limiting, TOTP replay protection, hashed backup codes, session management improvements
 - **2.1.0**: Multi-tenancy, Google OAuth authentication, MFA support (TOTP/Email), admin panel, invite system
 - **1.x**: Initial release with basic weight tracking
 
