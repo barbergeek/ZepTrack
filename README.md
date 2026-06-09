@@ -1,6 +1,6 @@
 # ZepTrack
 
-ZepTrack is a modern, responsive web application designed to track weight loss progress and Zepbound dosage history. It features Google OAuth authentication, multi-factor authentication, multi-tenancy support, and a sophisticated dashboard with interactive analytics.
+ZepTrack is a modern, responsive web application designed to track weight loss progress and Zepbound (tirzepatide) dosage history. It features Google OAuth authentication, multi-factor authentication, multi-tenancy support, and a sophisticated dashboard with interactive analytics.
 
 ## Features
 
