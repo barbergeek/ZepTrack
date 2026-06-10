@@ -156,5 +156,15 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  const version = process.env.npm_package_version || 'unknown';
+  const env = process.env.NODE_ENV || 'development';
+  const dbPath = process.env.DB_PATH || './data/zeptrack.db';
+  const smtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  console.log(`ZepTrack v${version} started`);
+  console.log(`  Port:        ${PORT}`);
+  console.log(`  Environment: ${env}`);
+  console.log(`  Node.js:     ${process.version}`);
+  console.log(`  Database:    ${dbPath}`);
+  console.log(`  SMTP:        ${smtpConfigured ? 'configured' : 'not configured'}`);
+  console.log(`  Started:     ${new Date().toISOString()}`);
 });
