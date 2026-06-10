@@ -431,3 +431,53 @@ authRouter.post('/mfa/verify', mfaPending, async (req, res) => {
     },
   });
 });
+
+// POST /api/auth/dev-login — development only, never active in production
+if (process.env.NODE_ENV !== 'production') {
+  authRouter.post('/dev-login', (req, res) => {
+    const db: Database = (req as any).db;
+
+    let user = db.findUserByEmail('dev@zeptrack.local');
+    if (!user) {
+      user = db.createUserWithFirstAdminCheck({
+        email: 'dev@zeptrack.local',
+        name: 'Dev User',
+        oauthProvider: 'dev',
+        oauthId: 'dev',
+      });
+    }
+
+    const sessionId = crypto.randomUUID();
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      mfaVerified: true,
+      sessionId,
+    });
+
+    db.createSession({
+      id: sessionId,
+      userId: user.id,
+      tokenHash: hashToken(token),
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      expiresAt: Date.now() + getExpiryMs(),
+    });
+
+    res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        role: user.role,
+        mfaEnabled: user.mfaEnabled,
+        mfaMethod: user.mfaMethod,
+        heightInches: user.heightInches,
+        targetWeight: user.targetWeight,
+      },
+    });
+  });
+}

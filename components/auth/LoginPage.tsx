@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, FlaskConical } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -142,6 +142,22 @@ export function LoginPage({ inviteToken }: LoginPageProps) {
               <div ref={buttonRef} className="flex justify-center"></div>
             )}
           </div>
+
+          {/* Dev bypass — only rendered in development builds */}
+          {import.meta.env.DEV && (
+            <div className="border-t border-dashed border-slate-200 pt-4">
+              <button
+                onClick={async () => {
+                  const res = await fetch(`${API_BASE_URL}/auth/dev-login`, { method: 'POST', credentials: 'include' });
+                  if (res.ok) window.location.reload();
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 hover:border-slate-400 text-xs font-medium transition-colors"
+              >
+                <FlaskConical size={14} />
+                Dev Login (local only)
+              </button>
+            </div>
+          )}
 
           {/* Privacy note */}
           <p className="text-xs text-slate-400 text-center">
