@@ -11,8 +11,8 @@ export const Card: React.FC<CardProps> = ({ children, className = '', title, act
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>
       {(title || action) && (
-        <div className="px-6 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-          {title && <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">{title}</h3>}
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+          {title && <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{title}</h3>}
           {action && <div>{action}</div>}
         </div>
       )}
@@ -35,7 +35,7 @@ export const StatCard: React.FC<{
   >
     <span className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-1">{label}</span>
     <div className="flex items-end gap-2">
-      <span className="text-3xl font-bold text-slate-800 tracking-tight">{value}</span>
+      <span className="text-3xl font-display text-slate-800">{value}</span>
       {subtext && <span className="text-sm text-slate-400 font-medium mb-1">{subtext}</span>}
     </div>
     {onClick && (

@@ -141,14 +141,14 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-0">
-      <nav className="bg-white border-b border-slate-100 sticky top-0 z-30">
+      <nav className="bg-brand-900 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="bg-brand-600 p-2 rounded-lg text-white">
+              <div className="bg-brand-700 p-2 rounded-lg text-white">
                 <Activity size={20} />
               </div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">ZepTrack</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight">ZepTrack</h1>
             </div>
             <div className="flex items-center gap-4">
               {user && (
@@ -156,19 +156,19 @@ const App: React.FC = () => {
                   {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
-                      <span className="text-sm font-bold text-brand-600">
+                    <div className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center">
+                      <span className="text-sm font-bold text-brand-200">
                         {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
-                  <span className="text-sm text-slate-600">{user.name || user.email}</span>
+                  <span className="text-sm text-brand-200">{user.name || user.email}</span>
                 </div>
               )}
-              <button onClick={() => setView('settings')} className={`p-2 rounded-lg transition-colors ${view === 'settings' ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600'}`}>
+              <button onClick={() => setView('settings')} className={`p-2 rounded-lg transition-colors ${view === 'settings' ? 'text-white bg-brand-700' : 'text-brand-300 hover:text-white'}`}>
                 <Settings size={20} />
               </button>
-              <button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
+              <button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="inline-flex items-center gap-2 bg-white hover:bg-brand-50 text-brand-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
                 <Plus size={18} />
                 <span className="hidden sm:inline">Log Entry</span>
               </button>
@@ -202,7 +202,7 @@ const App: React.FC = () => {
                         <circle className="text-brand-500 transition-all duration-1000 ease-out" strokeWidth="8" strokeDasharray={264} strokeDashoffset={264 - (264 * stats.progressPercent) / 100} strokeLinecap="round" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" />
                       </svg>
                       <div className="absolute flex flex-col items-center">
-                        <span className="text-3xl font-black text-slate-800">{Math.round(stats.progressPercent)}%</span>
+                        <span className="text-3xl font-display text-slate-800">{Math.round(stats.progressPercent)}%</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">To Goal</span>
                       </div>
                     </div>
@@ -381,13 +381,13 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:hidden z-30">
+      <div className="fixed bottom-0 left-0 right-0 bg-brand-900 border-t border-brand-800 md:hidden z-30">
         <div className="flex justify-around items-center h-16">
-          <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 ${view === 'dashboard' ? 'text-brand-600' : 'text-slate-400'}`}><LayoutDashboard size={20}/><span className="text-[10px] font-bold">DASH</span></button>
-          <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 ${view === 'history' ? 'text-brand-600' : 'text-slate-400'}`}><History size={20}/><span className="text-[10px] font-bold">HISTORY</span></button>
-          <button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="flex flex-col items-center justify-center -translate-y-4 bg-brand-600 text-white w-14 h-14 rounded-full shadow-lg border-4 border-white"><Plus size={28}/></button>
-          <button onClick={() => setView('dosage')} className={`flex flex-col items-center gap-1 ${view === 'dosage' ? 'text-brand-600' : 'text-slate-400'}`}><Pill size={20}/><span className="text-[10px] font-bold">DOSAGE</span></button>
-          <button onClick={() => setView('settings')} className={`flex flex-col items-center gap-1 ${view === 'settings' ? 'text-brand-600' : 'text-slate-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">SETUP</span></button>
+          <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 ${view === 'dashboard' ? 'text-white' : 'text-brand-400'}`}><LayoutDashboard size={20}/><span className="text-[10px] font-bold">DASH</span></button>
+          <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 ${view === 'history' ? 'text-white' : 'text-brand-400'}`}><History size={20}/><span className="text-[10px] font-bold">HISTORY</span></button>
+          <button onClick={() => { setEditingEntry(null); setIsModalOpen(true); }} className="flex flex-col items-center justify-center -translate-y-4 bg-white text-brand-800 w-14 h-14 rounded-full shadow-lg border-4 border-brand-900"><Plus size={28}/></button>
+          <button onClick={() => setView('dosage')} className={`flex flex-col items-center gap-1 ${view === 'dosage' ? 'text-white' : 'text-brand-400'}`}><Pill size={20}/><span className="text-[10px] font-bold">DOSAGE</span></button>
+          <button onClick={() => setView('settings')} className={`flex flex-col items-center gap-1 ${view === 'settings' ? 'text-white' : 'text-brand-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">SETUP</span></button>
         </div>
       </div>
 
