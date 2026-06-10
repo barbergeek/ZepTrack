@@ -32,8 +32,8 @@ function getTransporter(): nodemailer.Transporter | null {
 export async function sendMFACode(email: string, code: string): Promise<boolean> {
   const transport = getTransporter();
   if (!transport) {
-    console.log(`[DEV] MFA code for ${email}: ${code}`);
-    return true;
+    console.warn(`[DEV] SMTP not configured — MFA code not sent to ${email}`);
+    return false;
   }
 
   try {
@@ -64,8 +64,8 @@ export async function sendMFACode(email: string, code: string): Promise<boolean>
 export async function sendInvite(email: string, inviteUrl: string, inviterName: string): Promise<boolean> {
   const transport = getTransporter();
   if (!transport) {
-    console.log(`[DEV] Invite for ${email}: ${inviteUrl}`);
-    return true;
+    console.warn(`[DEV] SMTP not configured — invite not sent to ${email}`);
+    return false;
   }
 
   try {
