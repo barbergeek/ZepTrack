@@ -231,6 +231,7 @@ docker run -d -p 3000:3000 -v zeptrack-data:/app/data \
 
 ## Version History
 
+- **2.3.4**: Design refresh — DM Sans + DM Serif Display typography, dark branded navigation, dev-only login bypass
 - **2.3.3**: Security fix — stop logging MFA codes and invite tokens when SMTP is unconfigured
 - **2.3.2**: Expanded server startup log with version, port, environment, Node.js version, database path, and SMTP status
 - **2.3.1**: Security — resolved 14 npm audit vulnerabilities (nodemailer, concurrently, vite, and transitive deps)
